@@ -7,6 +7,7 @@
 //
 
 import UIKit
+import CoreLocation
 
 class DetailVC: UIViewController {
 
@@ -17,15 +18,89 @@ class DetailVC: UIViewController {
     @IBOutlet weak var currentImage: UIImageView!
     
     var currentPage: Int = 0
-    var locationsArray = [String]()
+    var locationsArray = [WeatherLocation]()
+    let locationManager = CLLocationManager()
+    var currentLocation: CLLocation!
     
     
     override func viewDidLoad() {
         super.viewDidLoad()
 
-        locationLabel.text = locationsArray[currentPage]
+        locationManager.delegate = self
+        if currentPage == 0 {
+            getLocation()
+        }
+        locationsArray[currentPage].getWeather {
+            self.updateUserInterface()
+        }
     }
     
-    
+    func updateUserInterface() {
+        locationLabel.text = locationsArray[currentPage].name
+        dateLabel.text = locationsArray[currentPage].coordinates
+        let curTemperature = String(format: "%3.f", locationsArray[currentPage].currentTemp) + "°"
+        temperatureLabel.text = curTemperature
+        print(curTemperature)
+        summaryLabel.text = locationsArray[currentPage].dailySummary
+    }
+}
 
+
+extension DetailVC: CLLocationManagerDelegate {
+    
+    func getLocation() {
+        let status = CLLocationManager.authorizationStatus()
+        handleLocationAuthorizationStatus(status: status)
+    }
+    
+    func handleLocationAuthorizationStatus(status: CLAuthorizationStatus) {
+        switch status {
+        case .notDetermined:
+            locationManager.requestWhenInUseAuthorization()
+        case .authorizedWhenInUse, .authorizedAlways:
+            locationManager.startUpdatingLocation()
+        case .denied:
+            print("User must authorize location services.")
+        case .restricted:
+            print("Access denied. Restrictions are in place.")
+        }
+    }
+    
+    func locationManager(_ manager: CLLocationManager, didChangeAuthorization status: CLAuthorizationStatus) {
+        handleLocationAuthorizationStatus(status: status)
+    }
+    
+    func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
+        
+        if currentPage == 0 {
+            let geoCoder = CLGeocoder()
+            currentLocation = locations.last
+            let currentLat = "\(currentLocation.coordinate.latitude)"
+            let currentLong = "\(currentLocation.coordinate.longitude)"
+            
+            print("Coordinates are: " + currentLat + currentLong)
+            
+            var place = ""
+            geoCoder.reverseGeocodeLocation(currentLocation, completionHandler: {placemarks, error in
+                if placemarks != nil {
+                    let placemark = placemarks!.last
+                    place = (placemark?.name!)!
+                } else {
+                    print("Error retrieving place. Error code: \(error)")
+                    place = "Parts Unknown"
+                }
+                print(place)
+                self.locationsArray[0].name = place
+                self.locationsArray[0].coordinates = currentLat + "," + currentLong
+                self.locationsArray[0].getWeather() {
+                self.updateUserInterface()
+                }
+            })
+        }
+        locationManager.stopUpdatingLocation()
+    }
+    
+    func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
+        print("Error getting location. Error code: \(error)")
+    }
 }
