@@ -57,6 +57,13 @@ class ListVC: UIViewController {
         autocompleteController.delegate = self
         present(autocompleteController, animated: true, completion: nil)
     }
+    
+    func saveUserDefault() {
+        var locationsDefaultArray = [WeatherUserDefault]()
+        locationsDefaultArray = locationsArray
+        let locationsData = NSKeyedArchiver.archivedData(withRootObject: locationsDefaultArray)
+        UserDefaults.standard.set(locationsData, forKey: "locationsData")
+    }
 
 }
 
@@ -81,6 +88,7 @@ extension ListVC: UITableViewDataSource, UITableViewDelegate {
         if editingStyle == .delete {
             locationsArray.remove(at: indexPath.row)
             tableView.deleteRows(at: [indexPath], with: .fade)
+            saveUserDefault()
             
         
         }
@@ -91,6 +99,7 @@ extension ListVC: UITableViewDataSource, UITableViewDelegate {
         let itemToMove = locationsArray[sourceIndexPath.row]
         locationsArray.remove(at: sourceIndexPath.row)
         locationsArray.insert(itemToMove, at: destinationIndexPath.row)
+        saveUserDefault()
         
     }
     // MARK: - Freeze first cell 
@@ -124,6 +133,7 @@ extension ListVC: UITableViewDataSource, UITableViewDelegate {
         print(newLocation.coordinates)
         locationsArray.append(newLocation)
         tableView.reloadData()
+        saveUserDefault()
     }
     
 }

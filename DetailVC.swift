@@ -18,6 +18,7 @@ class DetailVC: UIViewController {
     @IBOutlet weak var currentImage: UIImageView!
     @IBOutlet weak var tableView: UITableView!
     
+    @IBOutlet weak var collectionView: UICollectionView!
     
     var currentPage: Int = 0
     var locationsArray = [WeatherLocation]()
@@ -29,7 +30,8 @@ class DetailVC: UIViewController {
         super.viewDidLoad()
         tableView.delegate = self
         tableView.dataSource = self
-
+        collectionView.delegate = self
+        collectionView.dataSource = self
         locationManager.delegate = self
         locationsArray[currentPage].getWeather {
             self.updateUserInterface()
@@ -50,14 +52,20 @@ class DetailVC: UIViewController {
         locationLabel.isHidden = isHidden
         
         locationLabel.text = locationsArray[currentPage].name
-        dateLabel.text = formatTimeForTimeZone(unixDateToFormat: locationsArray[currentPage].currentTime, timeZoneString: locationsArray[currentPage].timeZone)
-       // dateLabel.text = locationsArray[currentPage].coordinates
+        
+        if locationsArray[currentPage].currentTime == 0.0 {
+            dateLabel.text = ""
+        } else {
+            dateLabel.text = formatTimeForTimeZone(unixDateToFormat: locationsArray[currentPage].currentTime, timeZoneString: locationsArray[currentPage].timeZone)
+        }
+        
         let curTemperature = String(format: "%3.f", locationsArray[currentPage].currentTemp) + "°"
         temperatureLabel.text = curTemperature
         print(curTemperature)
         summaryLabel.text = locationsArray[currentPage].dailySummary
         currentImage.image = UIImage(named: locationsArray[currentPage].currentIcon)
         tableView.reloadData()
+        collectionView.reloadData()
     }
     
     func formatTimeForTimeZone(unixDateToFormat: TimeInterval, timeZoneString: String) -> String {
@@ -86,10 +94,19 @@ extension DetailVC: CLLocationManagerDelegate {
         case .authorizedWhenInUse, .authorizedAlways:
             locationManager.startUpdatingLocation()
         case .denied:
-            print("User must authorize location services.")
+            if currentPage == 0 && self.view.window != nil {
+                showAlert(title: "Location services must be turned on", message: "Please turn on location services to use the app")
+            }
         case .restricted:
-            print("Access denied. Restrictions are in place.")
+            showAlert(title: "Location services denied", message: "Parental restrictions may be denying location services that would be used in this app")
         }
+    }
+    
+    func showAlert(title: String, message: String) {
+        let alertController = UIAlertController(title: title, message: message, preferredStyle: .alert)
+        let defaultAction = UIAlertAction(title: "Ok", style: .default, handler: nil)
+        alertController.addAction(defaultAction)
+        present(alertController, animated: true, completion: nil)
     }
     
     func locationManager(_ manager: CLLocationManager, didChangeAuthorization status: CLAuthorizationStatus) {
@@ -98,7 +115,7 @@ extension DetailVC: CLLocationManagerDelegate {
     
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
         
-        if currentPage == 0 {
+        if currentPage == 0 && self.view.window != nil {
             let geoCoder = CLGeocoder()
             currentLocation = locations.last
             let currentLat = "\(currentLocation.coordinate.latitude)"
@@ -145,4 +162,17 @@ extension DetailVC: UITableViewDelegate, UITableViewDataSource {
     func tableView(_ tableView: UITableView, heightForRowAt indexPath: IndexPath) -> CGFloat {
         return 80
     }
+}
+
+extension DetailVC: UICollectionViewDelegate, UICollectionViewDataSource {
+    func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
+        return locationsArray[currentPage].hourlyForecastArray.count
+    }
+    
+    func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
+        let hourlyCell = collectionView.dequeueReusableCell(withReuseIdentifier: "HourlyCell", for: indexPath) as! HourlyWeatherCell
+        hourlyCell.configureCollectionCell(hourlyForecast: self.locationsArray[currentPage].hourlyForecastArray[indexPath.row], timeZone: self.locationsArray[currentPage].timeZone)
+        return hourlyCell
+    }
+    
 }
